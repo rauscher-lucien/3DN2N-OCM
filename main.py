@@ -75,7 +75,7 @@ def main():
         print(f"Train continue: {train_continue}")
     else:
         # If not running on the server, perhaps use a default data_dir or handle differently
-        train_data_dir = r"\\tier2.embl.de\prevedel\members\Rauscher\data\big_data_small-test\Nematostella_B"
+        train_data_dir = r"C:\Users\rausc\Documents\EMBL\data\Nematostella_B"
         project_dir = r"\\tier2.embl.de\prevedel\members\Rauscher\projects\3DN2N-OCM"
         project_name = 'nema-test_1'
         train_continue = 'off'

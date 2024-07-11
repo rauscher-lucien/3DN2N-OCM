@@ -125,6 +125,9 @@ class Trainer:
 
                 optimizer.zero_grad()
                 input_stack, target_stack = [x.squeeze(0).to(self.device) for x in data]
+                if len(input_stack.shape) == 4:
+                    input_stack = input_stack[np.newaxis, ...]
+                    target_stack = target_stack[np.newaxis, ...]
                 output_stack = model(input_stack)
                 loss = criterion(output_stack, target_stack)
                 train_loss += loss.item() 
@@ -132,7 +135,7 @@ class Trainer:
                 optimizer.step()
 
                 
-            if batch % self.num_freq_disp == 0:
+            if epoch % self.num_freq_disp == 0:
                 # Assuming transform_inv_train can handle the entire stack
                 input_stack = transform_inv_train(input_stack)
                 target_stack = transform_inv_train(target_stack)
