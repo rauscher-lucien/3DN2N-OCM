@@ -36,9 +36,9 @@ def main():
 
     #********************************************************#
 
-    project_dir = r"C:\Users\rausc\Documents\EMBL\projects\3DN2N-OCM\OCT-data-1-test_1"
-    data_dir = r"C:\Users\rausc\Documents\EMBL\data\big_data_small\OCT-data-1"
-    inference_name = 'inference'
+    project_dir = r"\\tier2.embl.de\prevedel\members\Rauscher\projects\3DN2N-OCM\droso-test_1"
+    data_dir = r"\\tier2.embl.de\prevedel\members\Rauscher\data\big_data_small-test\droso_good"
+    inference_name = 'inference-2'
 
 
     #********************************************************#

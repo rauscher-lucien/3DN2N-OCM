@@ -139,9 +139,9 @@ class InferenceDataset(torch.utils.data.Dataset):
                 self.preloaded_data[full_path] = volume
                 num_slices = volume.shape[0]
                 # Store indices for the start of each possible substack
-                total_possible_stacks = (num_slices - 2 * self.stack_depth) // 2 + 1
+                total_possible_stacks = num_slices - 2 * self.stack_depth
                 for i in range(total_possible_stacks):
-                    start_index = 2 * i  # Start index of the first slice in the substack
+                    start_index = i  # Start index of the first slice in the substack
                     pairs.append((full_path, start_index))
         return pairs
 
