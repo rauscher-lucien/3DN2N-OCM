@@ -38,8 +38,11 @@ def main():
 
     project_dir = r"\\tier2.embl.de\prevedel\members\Rauscher\projects\3DN2N-OCM\droso-test_1"
     data_dir = r"\\tier2.embl.de\prevedel\members\Rauscher\data\big_data_small-test\droso_good"
-    inference_name = 'inference-2'
+    inference_name = 'inference-3'
 
+    # Extract project_name and method_name
+    project_name = os.path.basename(project_dir)
+    method_name = os.path.basename(os.path.dirname(project_dir))
 
     #********************************************************#
 
@@ -54,8 +57,6 @@ def main():
     filenames = glob.glob(os.path.join(data_dir, "*.TIFF"))
     print("Following file will be denoised:  ", filenames[0])
 
-
-
     # check if GPU is accessible
     if torch.cuda.is_available():
         print("\nGPU will be used.")
@@ -67,14 +68,14 @@ def main():
     mean, std = load_normalization_params(checkpoints_dir)
     
     inf_transform = transforms.Compose([
-        Normalize(mean, std),
-        CropToMultipleOf32Inference(),
+        NormalizeInference(mean, std),
+        CropToMultipleOf16Inference(),
         ToTensorInference(),
     ])
 
     inv_inf_transform = transforms.Compose([
-        BackTo01Range(),
-        ToNumpy()
+        ToNumpy(),
+        Denormalize(mean, std)
     ])
 
     inf_dataset = InferenceDataset(
@@ -82,7 +83,7 @@ def main():
         transform=inf_transform
     )
 
-    batch_size = 1
+    batch_size = 2
     print("Dataset size:", len(inf_dataset))
     inf_loader = torch.utils.data.DataLoader(
         inf_dataset,
@@ -91,9 +92,8 @@ def main():
         num_workers=2
     )
 
-    
     model = UNet3D()
-    model, _ = load(checkpoints_dir, model)
+    model, epoch = load(checkpoints_dir, model)
 
     num_inf = len(inf_dataset)
     num_batch = int((num_inf / batch_size) + ((num_inf % batch_size) != 0))
@@ -110,64 +110,20 @@ def main():
             output_stack = model(input_stack)
 
             for i in range(0, batch_size):
-                output_img = output_stack[i, 0, 0, :, :]
-                output_img_np = inv_inf_transform(output_img)  # Convert output tensors to numpy format for saving
+                output_stack_pt = output_stack[i, 0, :, :, :]
+                output_stack_np = inv_inf_transform(output_stack_pt)  # Convert output tensors to numpy format for saving
 
-                output_images.append(output_img_np)
+                output_images.append(output_stack_np)
 
             print('BATCH %04d/%04d' % (batch, len(inf_loader)))
-
-    # Clip output images to the 0-1 range
-    output_images_clipped = [np.clip(img, 0, 1) for img in output_images]
     
     # Stack and save output images
-    output_stack = np.stack(output_images_clipped, axis=0)
-    tifffile.imwrite(os.path.join(inference_folder, 'output_stack.TIFF'), output_stack)
+    output_stack = np.stack(output_images, axis=0)
+    filename = f'output_stack-{method_name}-{project_name}-{inference_name}-epoch{epoch}.TIFF'
+    tifffile.imwrite(os.path.join(inference_folder, filename), output_stack)
 
     print("TIFF stacks created successfully.")
 
 if __name__ == '__main__':
     main()
-
-
-
-#     print("starting inference")
-#     with torch.no_grad():
-
-#         netG.eval()
-
-#         for batch, data in enumerate(inf_loader):
-
-#             input_img = data[0].to(device)
-#             output_img = netG(input_img)
-
-#             input_img = inv_inf_transform(input_img)[..., 0]
-#             output_img = inv_inf_transform(output_img)[..., 0]
-
-#             # input_img = np.clip(input_img, 0, 1)
-#             # output_img = np.clip(output_img, 0, 1)
-
-#             for j in range(0, batch_size):
-#                 name1 = batch
-#                 name2 = j
-#                 fileset = {'name': name,
-#                             'input': "%04d-%04d-input.png" % (name1, name2),
-#                             'output': "%04d-%04d-output.png" % (name1, name2),
-#                             'target': "%04d-%04d-label.png" % (name1, name2)}
-
-#                 input_img_1 = np.squeeze(input_img[j, :, :])
-#                 output_img_1 = np.squeeze(output_img[j, :, :])
-
-#                 input_img_1 = (input_img_1 * 255).astype(np.uint8)
-#                 output_img_1 = (output_img_1 * 255).astype(np.uint8)
-
-#                 input_img_path = os.path.join(inference_folder, fileset['input'])
-#                 output_img_path = os.path.join(inference_folder, fileset['output'])
-
-#                 # Image.fromarray(input_img_1).save(input_img_path)
-#                 Image.fromarray(output_img_1).save(output_img_path)
-
-
-# if __name__ == '__main__':
-#     main()
 

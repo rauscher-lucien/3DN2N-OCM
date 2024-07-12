@@ -36,6 +36,35 @@ class Normalize(object):
         target_normalized = (target_stack - self.mean) / self.std
 
         return input_normalized, target_normalized
+    
+
+class NormalizeInference(object):
+    """
+    Normalize an image using mean and standard deviation.
+    
+    Args:
+        mean (float or tuple): Mean for each channel.
+        std (float or tuple): Standard deviation for each channel.
+    """
+
+    def __init__(self, mean, std):
+        self.mean = mean
+        self.std = std
+
+    def __call__(self, data):
+        """
+        Args:
+            data (tuple): Containing input and target images to be normalized.
+        
+        Returns:
+            Tuple: Normalized input and target images.
+        """
+        input_stack = data
+
+        # Normalize input image
+        input_normalized = (input_stack - self.mean) / self.std
+
+        return input_normalized
 
 
 class RandomFlip(object):
@@ -115,39 +144,32 @@ class RandomCrop:
 
 
 
-class CropToMultipleOf32Inference(object):
+class CropToMultipleOf16Inference(object):
     """
-    Crop each slice in a stack of images to ensure their height and width are multiples of 32.
+    Crop each stack of images to ensure their depth, height, and width are multiples of 16.
     This is particularly useful for models that require input dimensions to be divisible by certain values.
     """
 
-    def __call__(self, data):
+    def __call__(self, stack):
         """
         Args:
-            stack (numpy.ndarray): Stack of images to be cropped, with shape (H, W, Num_Slices).
+            stack (numpy.ndarray): Stack of images to be cropped, with shape (depth, height, width).
 
         Returns:
             numpy.ndarray: Stack of cropped images.
         """
+        d, h, w = stack.shape  # Assuming stack is a numpy array with shape (depth, height, width)
 
-        stack = data[0]
-        d, h, w = stack.shape  # Assuming stack is a numpy array with shape (H, W, Num_Slices)
-
-        # Compute new dimensions to be multiples of 32
-        new_h = h - (h % 32)
-        new_w = w - (w % 32)
+        # Compute new dimensions to be multiples of 16
+        new_h = h - (h % 16)
+        new_w = w - (w % 16)
 
         # Calculate cropping margins
         top = (h - new_h) // 2
         left = (w - new_w) // 2
 
-        # Generate indices for cropping
-        id_y = np.arange(top, top + new_h, 1)[:, np.newaxis].astype(np.int32)
-        id_x = np.arange(left, left + new_w, 1).astype(np.int32)
-
-        # Crop each slice in the stack
-        cropped_stack = np.zeros((d, new_h, new_w), dtype=stack.dtype)
-        cropped_stack = stack[:, id_y, id_x].squeeze()
+        # Crop the stack
+        cropped_stack = stack[:, top:top + new_h, left:left + new_w]
 
         return cropped_stack
 
@@ -173,6 +195,7 @@ class ToNumpy(object):
     def __call__(self, data):
 
         return data.to('cpu').detach().numpy()
+    
     
     
     
@@ -249,3 +272,43 @@ class ToNumpyVideo(object):
         else:
             raise ValueError("Unsupported tensor format: input must be a single image (C, H, W), \
                              a batch of images (B, C, H, W), or a stack of images (B, C, H, W, Num_Frames).")
+        
+
+
+class Denormalize(object):
+    """
+    Denormalize an image using mean and standard deviation, then convert it to 16-bit format.
+    
+    Args:
+        mean (float or tuple): Mean for each channel.
+        std (float or tuple): Standard deviation for each channel.
+    """
+
+    def __init__(self, mean, std):
+        """
+        Initialize with mean and standard deviation.
+        
+        Args:
+            mean (float or tuple): Mean for each channel.
+            std (float or tuple): Standard deviation for each channel.
+        """
+        self.mean = mean
+        self.std = std
+    
+    def __call__(self, img):
+        """
+        Denormalize the image and convert it to 16-bit format.
+        
+        Args:
+            img (numpy array): Normalized image.
+        
+        Returns:
+            numpy array: Denormalized 16-bit image.
+        """
+        # Denormalize the image by reversing the normalization process
+        img_denormalized = (img * self.std) + self.mean
+
+        # Scale the image to the range [0, 65535] and convert to 16-bit unsigned integer
+        img_16bit = img_denormalized.astype(np.uint16)
+        
+        return img_16bit

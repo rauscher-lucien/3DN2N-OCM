@@ -121,7 +121,64 @@ class FinalDatasetExtraNoise(torch.utils.data.Dataset):
         return input_slices, target_slice
     
 
+
 class InferenceDataset(torch.utils.data.Dataset):
+    def __init__(self, root_folder_path, stack_depth=32, transform=None):
+        self.root_folder_path = root_folder_path
+        self.transform = transform
+        self.stack_depth = stack_depth
+        self.preloaded_data = {}
+        self.pairs = self.preload_volumes(root_folder_path)
+
+    def preload_volumes(self, root_folder_path):
+        pairs = []
+        for subdir, _, files in os.walk(root_folder_path):
+            sorted_files = sorted([f for f in files if f.lower().endswith('.tiff')])
+            for f in sorted_files:
+                full_path = os.path.join(subdir, f)
+                volume = tifffile.imread(full_path)
+                self.preloaded_data[full_path] = volume
+                num_slices = volume.shape[0]
+                
+                num_stacks = (num_slices + self.stack_depth - 1) // self.stack_depth  # Calculate the number of stacks needed
+                
+                for i in range(num_stacks):
+                    start_index = i * self.stack_depth
+                    pairs.append((full_path, start_index))
+        return pairs
+
+    def __len__(self):
+        return len(self.pairs)
+
+    def __getitem__(self, index):
+        file_path, start_index = self.pairs[index]
+        
+        # Access the preloaded entire volume
+        volume = self.preloaded_data[file_path]
+        
+        # Calculate end index
+        end_index = start_index + self.stack_depth
+        if end_index > volume.shape[0]:
+            end_index = volume.shape[0]
+        
+        # Fetch the actual slices
+        input_stack = volume[start_index:end_index]
+
+        # Pad the stack if necessary
+        if input_stack.shape[0] < self.stack_depth:
+            padding = self.stack_depth - input_stack.shape[0]
+            input_stack = np.pad(input_stack, ((0, padding), (0, 0), (0, 0)), mode='reflect')
+        
+        if self.transform:
+            input_stack = self.transform(input_stack)
+
+        input_stack = input_stack[np.newaxis, ...]
+
+        return input_stack
+
+
+
+class InferenceDatasetOld(torch.utils.data.Dataset):
     def __init__(self, root_folder_path, stack_depth=32, transform=None):
         self.root_folder_path = root_folder_path
         self.transform = transform
